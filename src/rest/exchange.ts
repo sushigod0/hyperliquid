@@ -51,8 +51,6 @@ import { ExchangeType, ENDPOINTS, CHAIN_IDS } from '../types/constants';
 import { SymbolConversion } from '../utils/symbolConversion';
 import { Hyperliquid } from '../index';
 
-// const IS_MAINNET = true; // Make sure this matches the IS_MAINNET in signing.ts
-
 export class ExchangeAPI {
   private wallet: ethers.Wallet;
   private httpApi: HttpApi;
@@ -86,7 +84,24 @@ export class ExchangeAPI {
     this.vaultAddress = vaultAddress;
   }
 
+  /**
+   * Get the current vault address for this ExchangeAPI instance
+   */
   private getVaultAddress(): string | null {
+    return this.vaultAddress;
+  }
+
+  /**
+   * Set the vault address for this ExchangeAPI instance
+   */
+  public setVaultAddress(vaultAddress: string | null): void {
+    this.vaultAddress = vaultAddress;
+  }
+
+  /**
+   * Get the current vault address (public method)
+   */
+  public getVaultAddressPublic(): string | null {
     return this.vaultAddress;
   }
 

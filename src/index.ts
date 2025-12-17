@@ -86,7 +86,7 @@ export class Hyperliquid {
     // Initialize REST API clients
     this.info = new InfoAPI(this.baseUrl, this.rateLimiter, this.symbolConversion, this);
 
-    // Initialize custom operations
+    // Initialize custom operations with the Hyperliquid instance
     this.custom = new CustomOperations(this);
 
     // Initialize WebSocket client if enabled
@@ -187,13 +187,7 @@ export class Hyperliquid {
         this.vaultAddress
       );
 
-      this.custom = new CustomOperations(
-        this.exchange,
-        this.info,
-        formattedPrivateKey,
-        this.symbolConversion,
-        this.walletAddress
-      );
+      this.custom = new CustomOperations(this);
 
       this.isValidPrivateKey = true;
     } catch (error) {
@@ -232,13 +226,10 @@ export class Hyperliquid {
         this,
         this.vaultAddress
       );
-      this.custom = new CustomOperations(
-        this.exchange,
-        this.info,
-        formattedPrivateKey,
-        this.symbolConversion,
-        this.walletAddress
-      );
+      
+      // FIXED: Initialize CustomOperations with the Hyperliquid instance
+      // This ensures proper vault address propagation
+      this.custom = new CustomOperations(this);
 
       // Initialize WebSocket payload manager if WebSocket is enabled
       if (this.enableWs && this.subscriptions) {
@@ -322,6 +313,36 @@ export class Hyperliquid {
 
   public async refreshAssetMapsNow(): Promise<void> {
     await this.symbolConversion.initialize();
+  }
+
+  /**
+   * Get the current vault address
+   */
+  public getVaultAddress(): string | null {
+    return this.vaultAddress || null;
+  }
+
+  /**
+   * Set the vault address for all trading operations
+   * This will update the vault address across all components
+   */
+  public setVaultAddress(vaultAddress: string | null): void {
+    this.vaultAddress = vaultAddress;
+    
+    // Update the ExchangeAPI vault address if it exists
+    if (this.exchange && typeof (this.exchange as any).setVaultAddress === 'function') {
+      (this.exchange as any).setVaultAddress(vaultAddress);
+    }
+    
+    // Update CustomOperations vault address if it exists
+    if (this.custom && typeof this.custom.setVaultAddress === 'function') {
+      this.custom.setVaultAddress(vaultAddress);
+    }
+    
+    // Update WebSocket payload manager vault address if it exists
+    if (this.wsPayloads && typeof this.wsPayloads.setVaultAddress === 'function') {
+      this.wsPayloads.setVaultAddress(vaultAddress);
+    }
   }
 }
 

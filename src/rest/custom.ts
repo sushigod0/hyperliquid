@@ -16,6 +16,7 @@ export class CustomOperations {
   private wallet?: ethers.Wallet;
   private symbolConversion: SymbolConversion;
   private walletAddress: string | null;
+  private vaultAddress: string | null;
   private parent?: Hyperliquid;
 
   constructor(
@@ -31,9 +32,12 @@ export class CustomOperations {
       this.exchange = exchangeOrParent.exchange;
       this.infoApi = exchangeOrParent.info;
       this.symbolConversion = exchangeOrParent.symbolConversion;
-      this.walletAddress = exchangeOrParent.isAuthenticated()
-        ? exchangeOrParent.isAuthenticated().toString()
-        : null;
+      
+      // Get the actual wallet address from the exchange instance
+      this.walletAddress = (exchangeOrParent.exchange as any)?.wallet?.address || null;
+      
+      // Get vault address from the parent instance
+      this.vaultAddress = (exchangeOrParent as any).vaultAddress || null;
     } else {
       // Original constructor
       this.exchange = exchangeOrParent;
@@ -43,6 +47,7 @@ export class CustomOperations {
       }
       this.symbolConversion = symbolConversionOrWalletAddress as SymbolConversion;
       this.walletAddress = walletAddress || null;
+      this.vaultAddress = null;
     }
   }
 
@@ -53,6 +58,19 @@ export class CustomOperations {
       );
     }
     return this.walletAddress || this.wallet!.address;
+  }
+
+  /**
+   * Get the address to use for position queries.
+   * If a vault address is set, use that; otherwise use the wallet address.
+   */
+  private getPositionQueryAddress(): string {
+    // If trading on behalf of a vault, query the vault's positions
+    if (this.vaultAddress) {
+      return this.vaultAddress;
+    }
+    // Otherwise query the user's own positions
+    return this.getUserAddress();
   }
 
   async cancelAllOrders(symbol?: string): Promise<CancelOrderResponse> {
@@ -153,8 +171,11 @@ export class CustomOperations {
     cloid?: string
   ): Promise<OrderResponse> {
     const convertedSymbol = await this.symbolConversion.convertSymbol(symbol);
-    const address = this.getUserAddress();
-    const positions = await this.infoApi.perpetuals.getClearinghouseState(address);
+    
+    // Use the position query address (vault address if trading for vault, wallet address otherwise)
+    const positionQueryAddress = this.getPositionQueryAddress();
+    
+    const positions = await this.infoApi.perpetuals.getClearinghouseState(positionQueryAddress);
     for (const position of positions.assetPositions) {
       const item = position.position;
       if (convertedSymbol !== item.coin) {
@@ -189,8 +210,10 @@ export class CustomOperations {
 
   async closeAllPositions(slippage: number = this.DEFAULT_SLIPPAGE): Promise<OrderResponse[]> {
     try {
-      const address = this.getUserAddress();
-      const positions = await this.infoApi.perpetuals.getClearinghouseState(address);
+      // Use the position query address (vault address if trading for vault, wallet address otherwise)
+      const positionQueryAddress = this.getPositionQueryAddress();
+      
+      const positions = await this.infoApi.perpetuals.getClearinghouseState(positionQueryAddress);
       const closeOrders: Promise<OrderResponse>[] = [];
 
       console.log(positions);
@@ -207,5 +230,19 @@ export class CustomOperations {
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Get the current vault address being used for trading
+   */
+  getVaultAddress(): string | null {
+    return this.vaultAddress;
+  }
+
+  /**
+   * Set the vault address for trading operations
+   */
+  setVaultAddress(vaultAddress: string | null): void {
+    this.vaultAddress = vaultAddress;
   }
 }
